@@ -15,7 +15,7 @@ export default function SignIn({ authState, updateAuth }) {
     e.preventDefault();
     try {
       updateAuth({ isLoading: true, error: null });
-      const res = await axios.post('http://localhost:3000/api/login', {
+      const res = await axios.post('https://chatboxfull.onrender.com/api/login', {
         email: form.email,
         password: form.password
       });

@@ -43,7 +43,7 @@ const ProfilePage = ({ token }) => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/api/users/me', {
+      const response = await axios.get('https://chatboxfull.onrender.com/api/users/me', {
         headers: { Authorization: token },
       });
       setUser((prev) => ({
@@ -73,7 +73,7 @@ const ProfilePage = ({ token }) => {
         formData.append('photo', file);
 
         const response = await axios.post(
-          'http://localhost:3000/api/upload/profile-photo',
+          'https://chatboxfull.onrender.com/api/upload/profile-photo',
           formData,
           {
             headers: {
@@ -98,7 +98,7 @@ const ProfilePage = ({ token }) => {
   const toggleEditMode = async () => {
     if (isEditing) {
       try {
-        await axios.put('http://localhost:3000/api/users/me', user, {
+        await axios.put('https://chatboxfull.onrender.com/api/users/me', user, {
           headers: { Authorization: token },
         });
         addNotification('Profile updated successfully');
