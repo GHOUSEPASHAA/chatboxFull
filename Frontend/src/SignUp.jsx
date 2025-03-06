@@ -25,7 +25,7 @@ export default function SignUp({ authState, updateAuth }) {
 
     try {
       updateAuth({ isLoading: true, error: null });
-      const res = await axios.post("http://localhost:3000/api/signup", {
+      const res = await axios.post("https://chatboxfull.onrender.com/api/signup", {
         name: form.name,
         email: form.email,
         password: form.password,
