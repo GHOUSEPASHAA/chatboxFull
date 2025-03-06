@@ -32,7 +32,7 @@ router.get('/users/me', authenticate, async (req, res) => {
             name: user.name,
             email: user.email,
             // router.get('/users/me')
-            photo: user.image ? `http://localhost:3000/uploads/${user.image}` : null,
+            photo: user.image ? `https://chatboxfull.onrender.com/uploads/${user.image}` : null,
             designation: user.designation,
             location: user.location,
             status: user.status
@@ -95,7 +95,7 @@ router.put('/users/me', authenticate, async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
-            photo: user.image ? `http://localhost:3000/uploads/${user.image}` : null,
+            photo: user.image ? `https://chatboxfull.onrender.com/uploads/${user.image}` : null,
             designation: user.designation,
             location: user.location,
             status: user.status
