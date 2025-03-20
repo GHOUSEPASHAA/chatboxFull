@@ -54,7 +54,7 @@ app.use('/api', fileRoutes);
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APISmCsJFRKatvB';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'V3HjrSSYlPRvDPc27TIhMODfeFzqde2XflyLSBzchPVB';
 
-app.get('/getToken', (req, res) => {
+app.get('/getToken', async (req, res) => { // Made async
     console.log(`[${new Date().toISOString()}] /getToken endpoint hit`);
     const { roomName, userId } = req.query;
 
@@ -77,7 +77,7 @@ app.get('/getToken', (req, res) => {
             canSubscribe: true,
         });
 
-        const jwt = token.toJwt();
+        const jwt = await token.toJwt(); // Await the Promise
         console.log('Generated JWT token:', jwt);
 
         const response = { token: jwt };
