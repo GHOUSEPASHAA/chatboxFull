@@ -24,15 +24,32 @@ const socketHandler = (io) => {
             socket.join(userId); // Join user's personal room
             socket.emit("userId", userId);
             console.log(`User ${userId} joined room ${userId}`);
+
+            // Update user status to "Online"
+            User.findByIdAndUpdate(userId, { status: "Online" }, { new: true })
+                .then((user) => {
+                    if (user) io.emit("statusUpdate", { userId, status: "Online" });
+                })
+                .catch((err) => console.error("Status update error:", err.message));
         } catch (err) {
             console.error("Connection token error:", err.message);
             socket.disconnect(true);
             return;
         }
 
-        socket.on("joinGroup", (groupId) => {
-            socket.join(groupId);
-            console.log(`User ${socket.userId} joined group room ${groupId}`);
+        socket.on("joinGroup", async (groupId) => {
+            try {
+                const group = await Group.findById(groupId);
+                if (!group) throw new Error("Group not found");
+                if (!group.members.some((m) => m.userId.toString() === socket.userId)) {
+                    throw new Error("User not a member of this group");
+                }
+                socket.join(groupId);
+                console.log(`User ${socket.userId} joined group room ${groupId}`);
+            } catch (err) {
+                console.error("Join group error:", err.message);
+                socket.emit("error", { message: err.message });
+            }
         });
 
         socket.on("leaveGroup", (groupId) => {
@@ -53,8 +70,7 @@ const socketHandler = (io) => {
                         group.creator.toString() !== socket.userId &&
                         (!member || !member.canSendMessages)
                     ) {
-                        socket.emit("error", { message: "No permission to send messages in this group" });
-                        return;
+                        throw new Error("No permission to send messages in this group");
                     }
                 }
 
@@ -98,22 +114,19 @@ const socketHandler = (io) => {
 
                     const recipientMessage = {
                         ...populatedMessage,
-                        sender: { _id: populatedMessage.sender._id, name: populatedMessage.sender.name },
-                        content: populatedMessage.encryptedContent,
+                        sender: { _id: socket.userId, name: sender.name },
+                        content: encryptedContent,
                         tempId: msgData.tempId,
                     };
 
                     const senderMessage = {
                         ...populatedMessage,
-                        sender: { _id: populatedMessage.sender._id, name: populatedMessage.sender.name },
-                        content: populatedMessage.plaintextContent,
+                        sender: { _id: socket.userId, name: sender.name },
+                        content: msgData.content,
                         tempId: msgData.tempId,
                     };
 
-                    console.log("Emitting to recipient:", recipientMessage);
                     io.to(msgData.recipient).emit("chatMessage", recipientMessage);
-
-                    console.log("Emitting to sender:", senderMessage);
                     io.to(socket.userId).emit("chatMessage", senderMessage);
                 } else if (msgData.group) {
                     message.group = msgData.group;
@@ -127,17 +140,16 @@ const socketHandler = (io) => {
 
                     const groupMessage = {
                         ...populatedMessage,
-                        sender: { _id: populatedMessage.sender._id, name: populatedMessage.sender.name },
-                        content: populatedMessage.plaintextContent,
+                        sender: { _id: socket.userId, name: sender.name },
+                        content: msgData.content,
                         tempId: msgData.tempId,
                     };
 
-                    console.log("Emitting to group:", groupMessage);
                     io.to(msgData.group).emit("chatMessage", groupMessage);
                 }
             } catch (err) {
                 console.error("Chat message error:", err.message);
-                socket.emit("error", { message: "Failed to send message" });
+                socket.emit("error", { message: err.message });
             }
         });
 
@@ -150,7 +162,7 @@ const socketHandler = (io) => {
                 io.to(to).emit("callRequest", { from: socket.userId });
             } catch (err) {
                 console.error("Call request error:", err.message);
-                socket.emit("error", { message: "Failed to initiate call" });
+                socket.emit("error", { message: err.message });
             }
         });
 
@@ -162,7 +174,7 @@ const socketHandler = (io) => {
                 io.to(to).emit("callAccepted");
             } catch (err) {
                 console.error("Call accept error:", err.message);
-                socket.emit("error", { message: "Failed to accept call" });
+                socket.emit("error", { message: err.message });
             }
         });
 
@@ -174,7 +186,7 @@ const socketHandler = (io) => {
                 io.to(to).emit("callRejected");
             } catch (err) {
                 console.error("Call reject error:", err.message);
-                socket.emit("error", { message: "Failed to reject call" });
+                socket.emit("error", { message: err.message });
             }
         });
 
@@ -190,21 +202,23 @@ const socketHandler = (io) => {
                 io.to(to).emit("callEnded");
             } catch (err) {
                 console.error("Call end error:", err.message);
-                socket.emit("error", { message: "Failed to end call" });
+                socket.emit("error", { message: err.message });
             }
         });
 
         // Group Call Events
-        socket.on("startGroupCall", async ({ groupId }) => {
+        socket.on("groupCallStarted", async ({ groupId, callerId }) => {
             try {
                 const group = await Group.findById(groupId).lean();
                 if (!group) throw new Error("Group not found");
+                if (!group.members.some((m) => m.userId.toString() === socket.userId)) {
+                    throw new Error("User not a member of this group");
+                }
                 console.log(`Group call started by ${socket.userId} for group ${groupId}`);
-                // Include callerId in the payload
                 io.to(groupId).emit("groupCallStarted", { groupId, callerId: socket.userId });
             } catch (err) {
                 console.error("Start group call error:", err.message);
-                socket.emit("error", { message: "Failed to start group call" });
+                socket.emit("error", { message: err.message });
             }
         });
 
@@ -212,59 +226,26 @@ const socketHandler = (io) => {
             try {
                 const group = await Group.findById(groupId).lean();
                 if (!group) throw new Error("Group not found");
-                // Keep this unrestricted or restrict to creator based on your preference
+                if (!group.members.some((m) => m.userId.toString() === socket.userId)) {
+                    throw new Error("User not a member of this group");
+                }
                 console.log(`Group call ended by ${socket.userId} for group ${groupId}`);
-                io.to(groupId).emit("groupCallEnded", { groupId });
+                io.to(groupId).emit("groupCallEnded");
             } catch (err) {
                 console.error("End group call error:", err.message);
-                socket.emit("error", { message: "Failed to end group call" });
-            }
-        });
-
-        // WebRTC Signaling Events
-        socket.on("offer", async ({ to, offer }) => {
-            try {
-                const recipient = await User.findById(to).lean();
-                if (!recipient) throw new Error("Recipient not found");
-                console.log(`Offer from ${socket.userId} to ${to}`);
-                io.to(to).emit("offer", { from: socket.userId, offer });
-            } catch (err) {
-                console.error("Offer error:", err.message);
-                socket.emit("error", { message: "Failed to send offer" });
-            }
-        });
-
-        socket.on("answer", async ({ to, answer }) => {
-            try {
-                const caller = await User.findById(to).lean();
-                if (!caller) throw new Error("Caller not found");
-                console.log(`Answer from ${socket.userId} to ${to}`);
-                io.to(to).emit("answer", { from: socket.userId, answer });
-            } catch (err) {
-                console.error("Answer error:", err.message);
-                socket.emit("error", { message: "Failed to send answer" });
-            }
-        });
-
-        socket.on("iceCandidate", async ({ to, candidate }) => {
-            try {
-                const recipient = await User.findById(to).lean();
-                if (!recipient) throw new Error("Recipient not found");
-                console.log(`ICE candidate from ${socket.userId} to ${to}`);
-                io.to(to).emit("iceCandidate", { from: socket.userId, candidate });
-            } catch (err) {
-                console.error("ICE candidate error:", err.message);
-                socket.emit("error", { message: "Failed to send ICE candidate" });
+                socket.emit("error", { message: err.message });
             }
         });
 
         socket.on("disconnect", async () => {
             console.log("Client disconnected:", socket.id);
             try {
-                const user = await User.findById(socket.userId);
+                const user = await User.findByIdAndUpdate(
+                    socket.userId,
+                    { status: "Offline" },
+                    { new: true }
+                );
                 if (user) {
-                    user.status = "Offline";
-                    await user.save();
                     io.emit("statusUpdate", { userId: socket.userId, status: "Offline" });
                 }
             } catch (err) {
