@@ -4,7 +4,7 @@ const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const { AccessToken } = require('livekit-server-sdk'); // Added this import
+const { AccessToken } = require('livekit-server-sdk');
 const socketHandler = require('./sockets/socketHandler');
 
 // Import Routes
@@ -18,7 +18,9 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: '*' } });
 
+// Middleware to attach io to req
 app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] Request received: ${req.method} ${req.url}`);
     req.io = io;
     next();
 });
@@ -41,6 +43,7 @@ app.get('/test', (req, res) => {
     console.log('Test endpoint hit');
     res.send('Server is running');
 });
+
 app.use('/api', authRoutes);
 app.use('/api', userRoutes);
 app.use('/api', groupRoutes);
@@ -52,11 +55,18 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APISmCsJFRKatvB';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'V3HjrSSYlPRvDPc27TIhMODfeFzqde2XflyLSBzchPVB';
 
 app.get('/getToken', (req, res) => {
+    console.log(`[${new Date().toISOString()}] /getToken endpoint hit`);
     const { roomName, userId } = req.query;
+
+    console.log('Query parameters:', { roomName, userId });
+
     try {
         if (!roomName || !userId) {
+            console.log('Missing required parameters: roomName or userId');
             return res.status(400).json({ error: 'roomName and userId are required' });
         }
+
+        console.log('Generating LiveKit token with:', { LIVEKIT_API_KEY, LIVEKIT_API_SECRET });
         const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity: userId,
         });
@@ -66,10 +76,18 @@ app.get('/getToken', (req, res) => {
             canPublish: true,
             canSubscribe: true,
         });
-        res.json({ token: token.toJwt() });
+
+        const jwt = token.toJwt();
+        console.log('Generated JWT token:', jwt);
+
+        const response = { token: jwt };
+        console.log('Sending response:', response);
+        res.json(response);
     } catch (error) {
-        console.error('Token generation error:', error);
-        res.status(500).json({ error: 'Failed to generate token' });
+        console.error('Token generation error:', error.message);
+        const errorResponse = { error: 'Failed to generate token' };
+        console.log('Sending error response:', errorResponse);
+        res.status(500).json(errorResponse);
     }
 });
 
@@ -77,7 +95,7 @@ app.get('/getToken', (req, res) => {
 socketHandler(io);
 
 // Start Server
-const PORT = process.env.PORT || 3000; // Use environment PORT for Render
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Test endpoint: http://localhost:${PORT}/test`);
