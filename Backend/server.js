@@ -51,6 +51,22 @@ socketHandler(io);
 
 // Start Server
 const PORT = 3000;
+const LIVEKIT_API_KEY = 'APISmCsJFRKatvB';
+const LIVEKIT_API_SECRET = 'V3HjrSSYlPRvDPc27TIhMODfeFzqde2XflyLSBzchPVB';
+
+app.get('/getToken', (req, res) => {
+    const { roomName, userId } = req.query;
+    const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+        identity: userId, // Unique user identifier
+    });
+    token.addGrant({
+        roomJoin: true,
+        room: roomName, // Room name for the call
+        canPublish: true,
+        canSubscribe: true,
+    });
+    res.json({ token: token.toJwt() });
+});
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Test endpoint: http://localhost:${PORT}/test`);
